@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CCM · MCS-Chile</title>
 <script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -894,95 +895,162 @@ function uAlert(m,t){ const a=document.getElementById('u-alert'); a.textContent=
 function eliminarUsuario(id){ if(id===state.sesionId){ alert('No puedes eliminar tu propia cuenta.'); return; } state.usuarios=state.usuarios.filter(u=>u.id!==id); saveState(); renderAll(); }
 
 
-// ─── AI EXTRACTION FROM COMPROBANTE ────────────────────────────────────────
+// ─── LOCAL EXTRACTION FROM COMPROBANTE (no API, no CORS) ──────────────────
+
+// Configure PDF.js worker
+if(typeof pdfjsLib !== 'undefined'){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+async function extractTextFromPDF(dataUrl){
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const bytes  = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  const pdf  = await pdfjsLib.getDocument({data:bytes}).promise;
+  let text = '';
+  for(let p=1;p<=pdf.numPages;p++){
+    const page  = await pdf.getPage(p);
+    const tc    = await page.getTextContent();
+    text += tc.items.map(i=>i.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+function parseComprobanteText(text, entidades){
+  // Normalize
+  const t = text.replace(/\s+/g,' ');
+
+  // ── Fecha ─────────────────────────────────────────────────────────────
+  let fecha = '';
+  const fMatch = t.match(/Fecha[:\s]+?(\d{1,2}[\/\-](\d{1,2})[\/\-](\d{4}))/i)
+               || t.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/);
+  if(fMatch){
+    const parts = fMatch[1].split(/[\/\-]/);
+    if(parts[2].length===4) fecha = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    else fecha = fMatch[1];
+  }
+
+  // ── Monto ─────────────────────────────────────────────────────────────
+  let monto = 0, moneda = 'CLP';
+  const mMatch = t.match(/Monto[^:]*\(CLP\)[^:\d]*(\d[\d\.]+)/i)
+              || t.match(/\$\s*([\d\.]+)/i)
+              || t.match(/Monto[^:]*:[^\d]*(\d[\d\.]+)/i);
+  if(mMatch){
+    monto = parseInt(mMatch[1].replace(/\./g,'').replace(/,/g,''));
+    moneda = 'CLP';
+  }
+
+  // ── Número de comprobante / ID transacción ────────────────────────────
+  let ref = '';
+  const rMatch = t.match(/Id\s*transac[^:]*:\s*(\S+)/i)
+              || t.match(/N[uú]mero\s+de\s+comprobante[^:]*:\s*(\S+)/i)
+              || t.match(/comprobante[^:]*:\s*(TEF\S+)/i)
+              || t.match(/(TEF[A-Z0-9]{10,})/i);
+  if(rMatch) ref = rMatch[1].trim();
+
+  // ── Destinatario (destino) ────────────────────────────────────────────
+  let destRaw = '';
+  const dMatch = t.match(/Nombre\s+Destinatario[:\s]+([^\n\r,]+?)(?:\s{2,}|Rut|RUT|$)/i)
+              || t.match(/Estimado\(?a\)?[:\s]+([^\n\r]+?)(?:\s{2,}|Te informamos|$)/i)
+              || t.match(/Traspaso\s+A[:\s]*([^\n\r,]+?)(?:\s{2,}|$)/i);
+  if(dMatch) destRaw = dMatch[1].trim();
+
+  // ── Origen (quien transfiere) ─────────────────────────────────────────
+  let origRaw = '';
+  const oMatch = t.match(/(?:titular(?:\s+de\s+la)?\s+Cuenta[^,]*,|cliente)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,4})(?:\s*,|\s+(?:ha|es))/i)
+              || t.match(/cliente\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-Za-záéíóúñ]+){1,4})\s+ha/i);
+  if(oMatch) origRaw = oMatch[1].trim();
+
+  // ── Match against known entities ──────────────────────────────────────
+  function matchEnt(raw){
+    if(!raw) return '';
+    const r = raw.toLowerCase().trim();
+    return entidades.find(e=>e.toLowerCase()===r)
+        || entidades.find(e=>r.includes(e.toLowerCase()))
+        || entidades.find(e=>e.toLowerCase().includes(r))
+        || '';
+  }
+
+  return {
+    fecha,
+    monto,
+    moneda,
+    ref,
+    origenRaw:  origRaw,
+    destinoRaw: destRaw,
+    origen:  matchEnt(origRaw),
+    destino: matchEnt(destRaw),
+  };
+}
+
 async function extractFromComprobante(){
   if(!pendingFile) return;
-  const btn=document.getElementById('ai-extract-btn');
-  const status=document.getElementById('ai-status');
-  if(btn._running) return; btn._running=true;
-  btn.disabled=true; btn.textContent='Extrayendo...';
-  status.className='alert alert-warning'; status.textContent='Analizando comprobante con IA...'; status.classList.remove('hidden');
+  const btn    = document.getElementById('ai-extract-btn');
+  const status = document.getElementById('ai-status');
+  if(btn._running) return;
+  btn._running = true;
+  btn.disabled = true; btn.textContent = 'Extrayendo...';
+  status.className = 'alert alert-warning';
+  status.textContent = 'Leyendo comprobante...';
+  status.classList.remove('hidden');
 
   try {
-    const entsList = state.entidades.join(', ') || 'no hay entidades aún';
-    const systemPrompt = `Eres un asistente que extrae datos de comprobantes de transferencia bancaria chilenos.
-Extrae los siguientes campos y responde SOLO con JSON válido, sin markdown ni explicación:
-{
-  "fecha": "YYYY-MM-DD",
-  "origen": "nombre de quien transfiere (busca coincidencia en entidades: ${entsList}; si no hay coincidencia exacta usa el nombre del comprobante)",
-  "destino": "nombre del destinatario (busca coincidencia en entidades: ${entsList}; si no hay coincidencia exacta usa el nombre del comprobante)",
-  "monto": 123456,
-  "moneda": "CLP",
-  "ref": "número de comprobante o referencia"
-}
-Moneda: si el monto tiene $ o puntos de miles sin decimales → CLP. Si tiene decimales tipo 1.234,56 puede ser otra moneda.
-Monto: devolver solo el número sin puntos ni signo $.`;
+    let extracted = null;
 
-    let messages;
-    if(pendingFile.type === 'application/pdf' || pendingFile.type.startsWith('image/')){
-      const base64 = pendingFile.data.split(',')[1];
-      const mediaType = pendingFile.type;
-      if(pendingFile.type.startsWith('image/')){
-        messages = [{role:'user', content:[
-          {type:'image', source:{type:'base64', media_type:mediaType, data:base64}},
-          {type:'text', text:'Extrae los datos de este comprobante de transferencia.'}
-        ]}];
-      } else {
-        messages = [{role:'user', content:[
-          {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
-          {type:'text', text:'Extrae los datos de este comprobante de transferencia.'}
-        ]}];
-      }
+    if(pendingFile.type === 'application/pdf'){
+      // ── PDF: extract text with PDF.js ────────────────────────────────
+      status.textContent = 'Extrayendo texto del PDF...';
+      const text = await extractTextFromPDF(pendingFile.data);
+      extracted  = parseComprobanteText(text, state.entidades);
+
+    } else if(pendingFile.type.startsWith('image/')){
+      // ── Image: show manual hint (no OCR library loaded) ──────────────
+      status.className = 'alert alert-warning';
+      status.innerHTML = 'Para imágenes la extracción automática no está disponible. <strong>Ingresa los datos manualmente.</strong>';
+      btn.disabled=false; btn.textContent='✦ Re-extraer'; btn._running=false;
+      return;
+
     } else {
-      // Fallback: text only
-      messages = [{role:'user', content:'No se puede leer el archivo adjunto directamente. Por favor ingresa los datos manualmente.'}];
-      status.className='alert alert-warning'; status.textContent='Formato de archivo no compatible con extracción automática. Ingresa los datos manualmente.';
-      btn.disabled=false; btn.textContent='✦ Extraer datos con IA';
+      status.className='alert alert-warning';
+      status.textContent='Formato no compatible. Ingresa los datos manualmente.';
+      btn.disabled=false; btn.textContent='✦ Re-extraer'; btn._running=false;
       return;
     }
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:400, system:systemPrompt, messages })
-    });
-    const data = await resp.json();
-    const txt = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    const clean = txt.replace(/```json|```/g,'').trim();
-    const extracted = JSON.parse(clean);
-
-    // Populate form fields
-    if(extracted.fecha) document.getElementById('fecha').value = extracted.fecha;
-    if(extracted.monto) document.getElementById('monto').value = extracted.monto;
+    // ── Populate fields ───────────────────────────────────────────────
+    if(extracted.fecha)  document.getElementById('fecha').value  = extracted.fecha;
+    if(extracted.monto)  document.getElementById('monto').value  = extracted.monto;
     if(extracted.moneda) document.getElementById('moneda').value = extracted.moneda;
-    if(extracted.ref)   document.getElementById('ref').value   = extracted.ref;
+    if(extracted.ref)    document.getElementById('ref').value    = extracted.ref;
+    if(extracted.origen)  document.getElementById('origen').value  = extracted.origen;
+    if(extracted.destino) document.getElementById('destino').value = extracted.destino;
 
-    // Match entities (case-insensitive partial match)
-    function matchEnt(name){
-      if(!name) return '';
-      const n=name.toLowerCase();
-      return state.entidades.find(e=>e.toLowerCase()===n) ||
-             state.entidades.find(e=>n.includes(e.toLowerCase())||e.toLowerCase().includes(n)) || '';
-    }
-    const origenMatch  = matchEnt(extracted.origen);
-    const destinoMatch = matchEnt(extracted.destino);
-    if(origenMatch)  document.getElementById('origen').value  = origenMatch;
-    if(destinoMatch) document.getElementById('destino').value = destinoMatch;
-
+    // ── Warnings ──────────────────────────────────────────────────────
     const warnings = [];
-    if(!origenMatch)  warnings.push(`Origen "${extracted.origen}" no encontrado en entidades — verifica el selector`);
-    if(!destinoMatch) warnings.push(`Destino "${extracted.destino}" no encontrado en entidades — verifica el selector`);
+    if(!extracted.origen && extracted.origenRaw)
+      warnings.push(`Origen "<strong>${extracted.origenRaw}</strong>" no está en entidades — selecciónalo manualmente o agrégalo primero`);
+    if(!extracted.destino && extracted.destinoRaw)
+      warnings.push(`Destino "<strong>${extracted.destinoRaw}</strong>" no está en entidades — selecciónalo manualmente o agrégalo primero`);
+    if(!extracted.monto)
+      warnings.push('No se pudo extraer el monto — ingrésalo manualmente');
 
     if(warnings.length){
       status.className='alert alert-warning';
-      status.innerHTML='<strong>Datos extraídos con advertencias:</strong><br>'+warnings.join('<br>');
+      status.innerHTML='<strong>Datos parcialmente extraídos:</strong><br>' + warnings.join('<br>');
     } else {
       status.className='alert alert-success';
-      status.textContent='Datos extraídos correctamente. Revisa y confirma antes de registrar.';
+      status.innerHTML=`Datos extraídos correctamente desde el comprobante.<br>
+        <span style="font-size:11px;font-family:var(--mono);">
+          ${extracted.origenRaw} → ${extracted.destinoRaw} · $${extracted.monto?.toLocaleString('es-CL')} ${extracted.moneda} · ${extracted.ref}
+        </span>`;
     }
-  } catch(e) {
+
+  } catch(e){
     status.className='alert alert-danger';
-    status.textContent='Error al extraer datos: '+(e.message||'Intenta nuevamente o ingresa manualmente.');
+    status.textContent='Error al leer el comprobante: '+(e.message||'Intenta con otro archivo o ingresa los datos manualmente.');
   }
+
   btn.disabled=false; btn.textContent='✦ Re-extraer'; btn._running=false;
 }
 
