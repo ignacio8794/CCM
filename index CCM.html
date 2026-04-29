@@ -84,9 +84,10 @@ textarea { height: auto; padding: 8px 10px; resize: vertical; }
 
 /* BADGES */
 .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
-.b-prestamo   { background: var(--blue-bg);  color: var(--blue); }
-.b-devolucion { background: var(--green-light); color: #1B5E37; }
-.b-balance    { background: #F3E8FF; color: #6B21A8; }
+.b-prestamo      { background: var(--blue-bg);  color: var(--blue); }
+.b-devolucion    { background: var(--green-light); color: #1B5E37; }
+.b-transferencia { background: var(--blue-bg); color: var(--blue); }
+.b-balance       { background: #F3E8FF; color: #6B21A8; }
 .b-admin   { background: var(--green-light); color: #1B5E37; }
 .b-editor  { background: var(--amber-bg);   color: var(--amber); }
 .b-viewer  { background: var(--bg);         color: var(--text-2); border: 1px solid var(--border); }
@@ -322,24 +323,26 @@ tr:hover td { background: var(--bg); }
       <div id="form-alert" class="hidden"></div>
       <div class="card">
         <div class="row">
-          <div><label class="lbl">Tipo</label>
-            <select id="tipo"><option value="prestamo">Préstamo</option><option value="devolucion">Devolución</option></select></div>
           <div><label class="lbl">Fecha</label><input type="date" id="fecha"></div>
+          <div><label class="lbl">Referencia / N° comprobante</label><input type="text" id="ref" placeholder="Ej: TEFMBCO2604..."></div>
         </div>
         <div class="row">
           <div><label class="lbl">Entidad que presta / devuelve</label><select id="origen"></select></div>
           <div><label class="lbl">Entidad que recibe</label><select id="destino"></select></div>
         </div>
-        <div class="row3">
+        <div class="row">
           <div><label class="lbl">Monto</label><input type="number" id="monto" placeholder="0" min="0"></div>
           <div><label class="lbl">Moneda</label>
             <select id="moneda"><option>CLP</option><option>USD</option><option>EUR</option><option>UF</option></select></div>
-          <div><label class="lbl">Referencia</label><input type="text" id="ref" placeholder="Ej: Factura 001"></div>
         </div>
         <div style="margin-bottom:12px;"><label class="lbl">Notas (opcional)</label>
           <textarea id="notas" rows="2" placeholder="Detalle del movimiento..."></textarea></div>
         <hr class="divider">
-        <div class="stitle">Comprobante de transferencia</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="stitle" style="margin-bottom:0;">Comprobante de transferencia</div>
+          <button class="btn btn-sm" id="ai-extract-btn" onclick="extractFromComprobante()" style="display:none;">✦ Extraer datos con IA</button>
+        </div>
+        <div id="ai-status" class="hidden" style="margin-bottom:10px;"></div>
         <div id="upload-wrap">
           <div class="upload-zone" id="upload-zone"
             ondragover="event.preventDefault();this.classList.add('dz')"
@@ -380,8 +383,7 @@ tr:hover td { background: var(--bg); }
         <select id="f-ent" onchange="renderHistorial()"><option value="">Todas las entidades</option></select>
         <select id="f-tipo" onchange="renderHistorial()">
           <option value="">Todos los tipos</option>
-          <option value="prestamo">Préstamos</option>
-          <option value="devolucion">Devoluciones</option>
+          <option value="transferencia">Transferencias</option>
           <option value="balance_inicial">Balance inicial</option>
         </select>
         <select id="f-mon" onchange="renderHistorial()"><option value="">Todas las monedas</option></select>
@@ -672,7 +674,8 @@ function calcSaldos(){
   const s={};
   const ensure=(a,b,cur)=>{ const k=[a,b].sort().join('|||'); if(!s[k]) s[k]={}; if(!s[k][cur]) s[k][cur]={ini:0,movs:0}; return{k,sign:a<b?1:-1}; };
   filterA(state.balancesIniciales).forEach(bi=>{ const{k}=ensure(bi.acreedor,bi.deudor,bi.moneda); s[k][bi.moneda].ini+=(bi.acreedor<bi.deudor?1:-1)*bi.monto; });
-  filterA(state.movimientos).forEach(m=>{ const{k,sign}=ensure(m.origen,m.destino,m.moneda); s[k][m.moneda].movs+=m.tipo==='prestamo'?sign*m.monto:-(sign*m.monto); });
+  // transferencia: origen transfirió a destino → destino debe a origen
+  filterA(state.movimientos).forEach(m=>{ const{k,sign}=ensure(m.origen,m.destino,m.moneda); s[k][m.moneda].movs+=sign*m.monto; });
   return s;
 }
 
@@ -705,13 +708,14 @@ function renderResumen(){
 
 // ─── REGISTRAR ─────────────────────────────────────────────────
 function registrar(){
-  const tipo=document.getElementById('tipo').value, fecha=document.getElementById('fecha').value;
+  const fecha=document.getElementById('fecha').value;
   const origen=document.getElementById('origen').value, destino=document.getElementById('destino').value;
   const monto=parseFloat(document.getElementById('monto').value), moneda=document.getElementById('moneda').value;
   const ref=document.getElementById('ref').value.trim(), notas=document.getElementById('notas').value.trim();
   if(!fecha||!origen||!destino||isNaN(monto)||monto<=0){ fAlert('Completa todos los campos requeridos.','danger'); return; }
   if(origen===destino){ fAlert('Origen y destino no pueden ser la misma entidad.','danger'); return; }
-  const mov={id:Date.now().toString(),tipo,fecha,origen,destino,monto,moneda,ref,notas,registradoPor:me().nombre};
+  // tipo siempre es 'transferencia'; el saldo se calcula por direccion (origen → destino)
+  const mov={id:Date.now().toString(),tipo:'transferencia',fecha,origen,destino,monto,moneda,ref,notas,registradoPor:me().nombre};
   if(pendingFile) mov.comprobante={name:pendingFile.name,size:pendingFile.size,type:pendingFile.type,data:pendingFile.data};
   state.movimientos.push(mov); saveState(); renderAll();
   document.getElementById('monto').value=''; document.getElementById('ref').value=''; document.getElementById('notas').value=''; clearFile();
@@ -741,9 +745,9 @@ function renderHistorial(){
   const showDel=canDo('canDelete');
   body.innerHTML=all.map(m=>{
     let badge='';
-    if(m.tipo==='prestamo')       badge='<span class="badge b-prestamo">Préstamo</span>';
-    else if(m.tipo==='devolucion') badge='<span class="badge b-devolucion">Devolución</span>';
-    else                           badge='<span class="badge b-balance">Bal. inicial</span>';
+    if(m.tipo==='transferencia')   badge='<span class="badge b-transferencia">Transferencia</span>';
+    else if(m.tipo==='balance_inicial') badge='<span class="badge b-balance">Bal. inicial</span>';
+    else badge='<span class="badge b-transferencia">Transferencia</span>';
     const comp=m.comprobante?`<button class="comp-btn" onclick="verComp('${m.id}')">Ver</button>`:`<span style="font-size:11px;color:var(--text-3);">—</span>`;
     let del='<td></td>';
     if(showDel){
@@ -764,8 +768,8 @@ function eliminar(id){ state.movimientos=state.movimientos.filter(m=>m.id!==id);
 // ─── UPLOAD ────────────────────────────────────────────────────
 function handleFile(f){ if(!f) return; if(f.size>5*1024*1024){ fAlert('El archivo supera 5 MB.','danger'); return; } const r=new FileReader(); r.onload=e=>{ pendingFile={name:f.name,size:f.size,type:f.type,data:e.target.result}; showPreview(pendingFile); }; r.readAsDataURL(f); }
 function handleDrop(e){ e.preventDefault(); document.getElementById('upload-zone').classList.remove('dz'); handleFile(e.dataTransfer.files[0]); }
-function showPreview(f){ document.getElementById('upload-wrap').classList.add('hidden'); document.getElementById('prev-wrap').classList.remove('hidden'); document.getElementById('prev-name').textContent=f.name; document.getElementById('prev-size').textContent=fmtSz(f.size); document.getElementById('prev-icon').textContent=f.type==='application/pdf'?'📄':'🖼'; document.getElementById('prev-content').innerHTML=f.type==='application/pdf'?`<iframe class="prev-pdf" src="${f.data}"></iframe>`:`<img class="prev-img" src="${f.data}" alt="Vista previa">`; }
-function clearFile(){ pendingFile=null; document.getElementById('upload-wrap').classList.remove('hidden'); document.getElementById('prev-wrap').classList.add('hidden'); document.getElementById('prev-content').innerHTML=''; document.getElementById('comp-file').value=''; }
+function showPreview(f){ document.getElementById('upload-wrap').classList.add('hidden'); document.getElementById('prev-wrap').classList.remove('hidden'); document.getElementById('prev-name').textContent=f.name; document.getElementById('prev-size').textContent=fmtSz(f.size); document.getElementById('prev-icon').textContent=f.type==='application/pdf'?'📄':'🖼'; document.getElementById('prev-content').innerHTML=f.type==='application/pdf'?`<iframe class="prev-pdf" src="${f.data}"></iframe>`:`<img class="prev-img" src="${f.data}" alt="Vista previa">`; document.getElementById('ai-extract-btn').style.display='inline-flex'; }
+function clearFile(){ pendingFile=null; document.getElementById('upload-wrap').classList.remove('hidden'); document.getElementById('prev-wrap').classList.add('hidden'); document.getElementById('prev-content').innerHTML=''; document.getElementById('comp-file').value=''; document.getElementById('ai-extract-btn').style.display='none'; document.getElementById('ai-status').classList.add('hidden'); }
 function fmtSz(b){ if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
 
 // ─── BALANCE INICIAL ───────────────────────────────────────────
@@ -874,6 +878,98 @@ function agregarUsuario(){
 }
 function uAlert(m,t){ const a=document.getElementById('u-alert'); a.textContent=m; a.className=`alert alert-${t}`; a.classList.remove('hidden'); }
 function eliminarUsuario(id){ if(id===state.sesionId){ alert('No puedes eliminar tu propia cuenta.'); return; } state.usuarios=state.usuarios.filter(u=>u.id!==id); saveState(); renderAll(); }
+
+
+// ─── AI EXTRACTION FROM COMPROBANTE ────────────────────────────────────────
+async function extractFromComprobante(){
+  if(!pendingFile) return;
+  const btn=document.getElementById('ai-extract-btn');
+  const status=document.getElementById('ai-status');
+  btn.disabled=true; btn.textContent='Extrayendo...';
+  status.className='alert alert-warning'; status.textContent='Analizando comprobante con IA...'; status.classList.remove('hidden');
+
+  try {
+    const entsList = state.entidades.join(', ') || 'no hay entidades aún';
+    const systemPrompt = `Eres un asistente que extrae datos de comprobantes de transferencia bancaria chilenos.
+Extrae los siguientes campos y responde SOLO con JSON válido, sin markdown ni explicación:
+{
+  "fecha": "YYYY-MM-DD",
+  "origen": "nombre de quien transfiere (busca coincidencia en entidades: ${entsList}; si no hay coincidencia exacta usa el nombre del comprobante)",
+  "destino": "nombre del destinatario (busca coincidencia en entidades: ${entsList}; si no hay coincidencia exacta usa el nombre del comprobante)",
+  "monto": 123456,
+  "moneda": "CLP",
+  "ref": "número de comprobante o referencia"
+}
+Moneda: si el monto tiene $ o puntos de miles sin decimales → CLP. Si tiene decimales tipo 1.234,56 puede ser otra moneda.
+Monto: devolver solo el número sin puntos ni signo $.`;
+
+    let messages;
+    if(pendingFile.type === 'application/pdf' || pendingFile.type.startsWith('image/')){
+      const base64 = pendingFile.data.split(',')[1];
+      const mediaType = pendingFile.type;
+      if(pendingFile.type.startsWith('image/')){
+        messages = [{role:'user', content:[
+          {type:'image', source:{type:'base64', media_type:mediaType, data:base64}},
+          {type:'text', text:'Extrae los datos de este comprobante de transferencia.'}
+        ]}];
+      } else {
+        messages = [{role:'user', content:[
+          {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
+          {type:'text', text:'Extrae los datos de este comprobante de transferencia.'}
+        ]}];
+      }
+    } else {
+      // Fallback: text only
+      messages = [{role:'user', content:'No se puede leer el archivo adjunto directamente. Por favor ingresa los datos manualmente.'}];
+      status.className='alert alert-warning'; status.textContent='Formato de archivo no compatible con extracción automática. Ingresa los datos manualmente.';
+      btn.disabled=false; btn.textContent='✦ Extraer datos con IA';
+      return;
+    }
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:400, system:systemPrompt, messages })
+    });
+    const data = await resp.json();
+    const txt = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const clean = txt.replace(/```json|```/g,'').trim();
+    const extracted = JSON.parse(clean);
+
+    // Populate form fields
+    if(extracted.fecha) document.getElementById('fecha').value = extracted.fecha;
+    if(extracted.monto) document.getElementById('monto').value = extracted.monto;
+    if(extracted.moneda) document.getElementById('moneda').value = extracted.moneda;
+    if(extracted.ref)   document.getElementById('ref').value   = extracted.ref;
+
+    // Match entities (case-insensitive partial match)
+    function matchEnt(name){
+      if(!name) return '';
+      const n=name.toLowerCase();
+      return state.entidades.find(e=>e.toLowerCase()===n) ||
+             state.entidades.find(e=>n.includes(e.toLowerCase())||e.toLowerCase().includes(n)) || '';
+    }
+    const origenMatch  = matchEnt(extracted.origen);
+    const destinoMatch = matchEnt(extracted.destino);
+    if(origenMatch)  document.getElementById('origen').value  = origenMatch;
+    if(destinoMatch) document.getElementById('destino').value = destinoMatch;
+
+    const warnings = [];
+    if(!origenMatch)  warnings.push(`Origen "${extracted.origen}" no encontrado en entidades — verifica el selector`);
+    if(!destinoMatch) warnings.push(`Destino "${extracted.destino}" no encontrado en entidades — verifica el selector`);
+
+    if(warnings.length){
+      status.className='alert alert-warning';
+      status.innerHTML='<strong>Datos extraídos con advertencias:</strong><br>'+warnings.join('<br>');
+    } else {
+      status.className='alert alert-success';
+      status.textContent='Datos extraídos correctamente. Revisa y confirma antes de registrar.';
+    }
+  } catch(e) {
+    status.className='alert alert-danger';
+    status.textContent='Error al extraer datos: '+(e.message||'Intenta nuevamente o ingresa manualmente.');
+  }
+  btn.disabled=false; btn.textContent='✦ Extraer datos con IA';
+}
 
 // ─── INIT ──────────────────────────────────────────────────────
 renderRolHelp();
