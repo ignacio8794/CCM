@@ -554,12 +554,17 @@ async function loginM365(){
   // Try Teams JS SDK first (when running inside Teams)
   let profile=null;
   try {
-    await microsoftTeams.app.initialize();
-    const ctx = await microsoftTeams.app.getContext();
-    if(ctx?.user?.loginHint){
-      profile = { email: ctx.user.loginHint, name: ctx.user.displayName||ctx.user.loginHint.split('@')[0] };
+    if(typeof microsoftTeams !== 'undefined'){
+      await Promise.race([
+        microsoftTeams.app.initialize(),
+        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),3000))
+      ]);
+      const ctx = await microsoftTeams.app.getContext();
+      if(ctx?.user?.loginHint){
+        profile = { email: ctx.user.loginHint, name: ctx.user.displayName||ctx.user.loginHint.split('@')[0] };
+      }
     }
-  } catch(_){}
+  } catch(_){ /* not in Teams or SDK timeout — fall through to API */ }
 
   // Fallback: Claude API + M365 MCP (when running outside Teams)
   if(!profile?.email){
@@ -622,7 +627,16 @@ function showLoginErr(msg){
   e.innerHTML=msg; e.classList.remove('hidden');
 }
 
-function logout(){ state.sesionId=null; saveState(); location.reload(); }
+function logout(){
+  state.sesionId=null; saveState();
+  // Teams-compatible: hide app, show login without hard reload
+  document.getElementById('app-screen').classList.remove('visible');
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('ms-btn').disabled=false;
+  document.getElementById('ms-btn').style.display='flex';
+  document.getElementById('login-loading').classList.add('hidden');
+  document.getElementById('login-err').classList.add('hidden');
+}
 
 // ─── SHOW LOGIN / APP ──────────────────────────────────────────
 function showLogin(){ document.getElementById('login-screen').style.display='flex'; }
@@ -768,7 +782,7 @@ function eliminar(id){ state.movimientos=state.movimientos.filter(m=>m.id!==id);
 // ─── UPLOAD ────────────────────────────────────────────────────
 function handleFile(f){ if(!f) return; if(f.size>5*1024*1024){ fAlert('El archivo supera 5 MB.','danger'); return; } const r=new FileReader(); r.onload=e=>{ pendingFile={name:f.name,size:f.size,type:f.type,data:e.target.result}; showPreview(pendingFile); }; r.readAsDataURL(f); }
 function handleDrop(e){ e.preventDefault(); document.getElementById('upload-zone').classList.remove('dz'); handleFile(e.dataTransfer.files[0]); }
-function showPreview(f){ document.getElementById('upload-wrap').classList.add('hidden'); document.getElementById('prev-wrap').classList.remove('hidden'); document.getElementById('prev-name').textContent=f.name; document.getElementById('prev-size').textContent=fmtSz(f.size); document.getElementById('prev-icon').textContent=f.type==='application/pdf'?'📄':'🖼'; document.getElementById('prev-content').innerHTML=f.type==='application/pdf'?`<iframe class="prev-pdf" src="${f.data}"></iframe>`:`<img class="prev-img" src="${f.data}" alt="Vista previa">`; document.getElementById('ai-extract-btn').style.display='inline-flex'; }
+function showPreview(f){ document.getElementById('upload-wrap').classList.add('hidden'); document.getElementById('prev-wrap').classList.remove('hidden'); document.getElementById('prev-name').textContent=f.name; document.getElementById('prev-size').textContent=fmtSz(f.size); document.getElementById('prev-icon').textContent=f.type==='application/pdf'?'📄':'🖼'; document.getElementById('prev-content').innerHTML=f.type==='application/pdf'?`<iframe class="prev-pdf" src="${f.data}"></iframe>`:`<img class="prev-img" src="${f.data}" alt="Vista previa">`; document.getElementById('ai-extract-btn').style.display='inline-flex'; extractFromComprobante(); }
 function clearFile(){ pendingFile=null; document.getElementById('upload-wrap').classList.remove('hidden'); document.getElementById('prev-wrap').classList.add('hidden'); document.getElementById('prev-content').innerHTML=''; document.getElementById('comp-file').value=''; document.getElementById('ai-extract-btn').style.display='none'; document.getElementById('ai-status').classList.add('hidden'); }
 function fmtSz(b){ if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
 
@@ -885,6 +899,7 @@ async function extractFromComprobante(){
   if(!pendingFile) return;
   const btn=document.getElementById('ai-extract-btn');
   const status=document.getElementById('ai-status');
+  if(btn._running) return; btn._running=true;
   btn.disabled=true; btn.textContent='Extrayendo...';
   status.className='alert alert-warning'; status.textContent='Analizando comprobante con IA...'; status.classList.remove('hidden');
 
@@ -968,7 +983,7 @@ Monto: devolver solo el número sin puntos ni signo $.`;
     status.className='alert alert-danger';
     status.textContent='Error al extraer datos: '+(e.message||'Intenta nuevamente o ingresa manualmente.');
   }
-  btn.disabled=false; btn.textContent='✦ Extraer datos con IA';
+  btn.disabled=false; btn.textContent='✦ Re-extraer'; btn._running=false;
 }
 
 // ─── INIT ──────────────────────────────────────────────────────
@@ -980,7 +995,7 @@ function ensureAdmin(){
   const hasAdmin = state.usuarios.some(u=>u.rol==='admin');
   if(!hasAdmin && state.sesionId){
     const u=state.usuarios.find(u=>u.id===state.sesionId);
-    if(u){ u.rol='admin'; saveState(); }
+    if(u){ u.rol='admin'; saveState(); console.info('[CCM] Bootstrap: '+u.email+' → admin'); }
   }
 }
 
@@ -991,8 +1006,9 @@ window.CCM_promoteToAdmin = function(){
   const u=state.usuarios.find(u=>u.id===state.sesionId);
   if(!u){ console.warn('[CCM] Usuario no encontrado.'); return; }
   u.rol='admin'; saveState();
-  console.info('[CCM] '+u.email+' promovido a Administrador. Recargando...');
-  location.reload();
+  console.info('[CCM] '+u.email+' promovido a Administrador.');
+  // Soft re-render without page reload (Teams-compatible)
+  if(state.sesionId && state.usuarios.find(u=>u.id===state.sesionId)){ renderTabs(); renderAll(); showTab('resumen'); }
 };
 
 if(state.sesionId && state.usuarios.find(u=>u.id===state.sesionId)){
