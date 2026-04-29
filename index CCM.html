@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCM · MCS-Chile</title>
+<script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green:       #2E7D52;
+  --green-light: #E6F4EC;
+  --green-mid:   #4CAF79;
+  --bg:          #F7F8F6;
+  --surface:     #FFFFFF;
+  --border:      #E2E5DF;
+  --border-mid:  #CDD1C8;
+  --text:        #1A1D18;
+  --text-2:      #5A6054;
+  --text-3:      #98A090;
+  --red:         #D85A30;
+  --red-bg:      #FDF1ED;
+  --blue:        #185FA5;
+  --blue-bg:     #E6F1FB;
+  --amber:       #854F0B;
+  --amber-bg:    #FDF3E3;
+  --radius:      8px;
+  --radius-lg:   12px;
+  --shadow:      0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:   0 4px 12px rgba(0,0,0,.08);
+  --font:        'IBM Plex Sans', sans-serif;
+  --mono:        'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* UTILS */
+.hidden   { display: none !important; }
+.lbl      { font-size: 11px; font-weight: 500; color: var(--text-2); margin-bottom: 5px; display: block; letter-spacing: .03em; text-transform: uppercase; }
+.divider  { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.mono     { font-family: var(--mono); }
+
+/* FORM CONTROLS */
+input, select, textarea {
+  width: 100%; height: 36px; padding: 0 10px;
+  font-size: 13px; font-family: var(--font);
+  border: 1px solid var(--border-mid); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
+  transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(46,125,82,.1); }
+textarea { height: auto; padding: 8px 10px; resize: vertical; }
+
+.row  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+@media(max-width:600px){ .row,.row3 { grid-template-columns: 1fr; } }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px; padding: 0 16px;
+  font-size: 13px; font-family: var(--font); font-weight: 500;
+  border: 1px solid var(--border-mid); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.btn:hover { background: var(--bg); border-color: var(--border-mid); }
+.btn-primary { background: var(--green); color: #fff; border-color: var(--green); }
+.btn-primary:hover { background: #256642; border-color: #256642; }
+.btn-sm  { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn-xs  { height: 22px; padding: 0 8px; font-size: 11px; }
+.btn-danger { color: var(--red); border-color: rgba(216,90,48,.3); }
+.btn-danger:hover { background: var(--red-bg); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ALERTS */
+.alert { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+.alert-success { background: var(--green-light); color: #1B5E37; border: 1px solid #B6DCCA; }
+.alert-danger   { background: var(--red-bg);    color: var(--red);  border: 1px solid #F5C6B4; }
+.alert-warning  { background: var(--amber-bg);  color: var(--amber);border: 1px solid #F5D9A8; }
+
+/* BADGES */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.b-prestamo   { background: var(--blue-bg);  color: var(--blue); }
+.b-devolucion { background: var(--green-light); color: #1B5E37; }
+.b-balance    { background: #F3E8FF; color: #6B21A8; }
+.b-admin   { background: var(--green-light); color: #1B5E37; }
+.b-editor  { background: var(--amber-bg);   color: var(--amber); }
+.b-viewer  { background: var(--bg);         color: var(--text-2); border: 1px solid var(--border); }
+
+/* ─── LOGIN ────────────────────────────────────────────────── */
+#login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+  background: linear-gradient(135deg, #F7F8F6 60%, #E6F4EC);
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 2.5rem 2rem 2rem;
+  width: min(380px,100%); box-shadow: var(--shadow-md);
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 1.75rem; }
+.brand-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--green), var(--green-mid));
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+  box-shadow: 0 2px 6px rgba(46,125,82,.35);
+}
+.brand-name { font-size: 14px; font-weight: 600; }
+.brand-sub  { font-size: 11px; color: var(--text-3); }
+.login-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; letter-spacing: -.01em; }
+.login-sub   { font-size: 13px; color: var(--text-2); margin-bottom: 1.5rem; }
+.ms-btn {
+  width: 100%; height: 42px; border: 1px solid var(--border-mid); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); font-size: 14px; font-family: var(--font); font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: all .15s; margin-bottom: 10px;
+}
+.ms-btn:hover { background: var(--bg); }
+.ms-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ms-logo { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; width: 18px; height: 18px; flex-shrink: 0; }
+.ms-r { background: #F25022; border-radius: 1px; }
+.ms-g { background: #7FBA00; border-radius: 1px; }
+.ms-b { background: #00A4EF; border-radius: 1px; }
+.ms-y { background: #FFB900; border-radius: 1px; }
+.loading-row { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 8px 0; font-size: 13px; color: var(--text-2); }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--border-mid); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.login-hint { font-size: 11px; color: var(--text-3); text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); line-height: 1.6; }
+.domain-pill { display: inline-block; font-size: 10px; font-family: var(--mono); color: var(--green); background: var(--green-light); padding: 2px 8px; border-radius: 10px; margin-top: 4px; }
+
+/* ─── APP SHELL ─────────────────────────────────────────────── */
+#app-screen { display: none; min-height: 100vh; flex-direction: column; }
+#app-screen.visible { display: flex; }
+
+.topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 20px; height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 50;
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; }
+.topbar-brand { font-size: 14px; font-weight: 600; }
+.topbar-env   { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+.topbar-right { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
+
+.tab-bar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 20px; display: flex; gap: 0; overflow-x: auto;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  padding: 14px 14px; font-size: 13px; font-weight: 400;
+  color: var(--text-2); background: none; border: none;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  white-space: nowrap; font-family: var(--font);
+  transition: color .15s;
+}
+.tab-btn.active { color: var(--text); font-weight: 500; border-bottom-color: var(--green); }
+.tab-btn:hover:not(.active) { color: var(--text); }
+
+.page-body { flex: 1; padding: 20px; max-width: 960px; width: 100%; margin: 0 auto; }
+
+/* ─── METRICS ───────────────────────────────────────────────── */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap: 10px; margin-bottom: 20px; }
+.metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+.metric-lbl { font-size: 11px; color: var(--text-3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.metric-val { font-size: 24px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+
+/* ─── BALANCE CARDS ─────────────────────────────────────────── */
+.stitle { font-size: 11px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+.bc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.bc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.bc-pair { font-size: 14px; font-weight: 500; }
+.bc-sep  { color: var(--text-3); font-weight: 400; font-size: 13px; margin: 0 6px; }
+.bc-row  { display: flex; align-items: flex-start; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); }
+.bc-cur  { font-size: 11px; font-family: var(--mono); color: var(--text-3); background: var(--bg); padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+.bc-net  { font-size: 15px; font-weight: 600; font-family: var(--mono); text-align: right; }
+.bc-dir  { font-size: 11px; color: var(--text-2); text-align: right; margin-top: 2px; }
+.bc-brk  { font-size: 10px; color: var(--text-3); font-family: var(--mono); text-align: right; margin-top: 2px; }
+.pos { color: #1D9E75; } .neg { color: var(--red); } .zero { color: var(--text-3); }
+
+/* ─── TABLE ─────────────────────────────────────────────────── */
+.tw { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { font-size: 11px; font-weight: 500; color: var(--text-3); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; text-transform: uppercase; letter-spacing: .04em; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+.tnum { font-family: var(--mono); }
+
+/* ─── FILTER ROW ─────────────────────────────────────────────── */
+.filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-row select { height: 32px; font-size: 12px; width: auto; flex: 0 0 auto; }
+
+/* ─── UPLOAD ─────────────────────────────────────────────────── */
+.upload-zone {
+  border: 1.5px dashed var(--border-mid); border-radius: var(--radius-lg);
+  padding: 20px; text-align: center; cursor: pointer; position: relative;
+  transition: all .15s; margin-bottom: 12px; background: var(--bg);
+}
+.upload-zone:hover, .upload-zone.dz { border-color: var(--green); background: var(--green-light); }
+.upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.prev-box { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 12px; background: var(--surface); }
+.prev-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--border); }
+.prev-name { font-size: 13px; font-weight: 500; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prev-img { width: 100%; max-height: 200px; object-fit: contain; display: block; background: var(--bg); }
+.prev-pdf { width: 100%; height: 160px; border: none; display: block; }
+.comp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: var(--amber-bg); color: var(--amber); border: none; cursor: pointer; font-family: var(--font); }
+.comp-btn:hover { filter: brightness(.95); }
+.comp-view { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; margin-bottom: 16px; }
+.comp-view img { width: 100%; border-radius: var(--radius); }
+.comp-view iframe { width: 100%; height: 360px; border: none; border-radius: var(--radius); display: block; }
+
+/* ─── USER CARDS ─────────────────────────────────────────────── */
+.uc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; margin-bottom: 20px; }
+.uc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; box-shadow: var(--shadow); }
+.uc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.av { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.av-admin  { background: var(--green-light); color: #1B5E37; }
+.av-editor { background: var(--amber-bg); color: var(--amber); }
+.av-viewer { background: var(--bg); color: var(--text-2); border: 1px solid var(--border); }
+.uc-name  { font-size: 13px; font-weight: 500; }
+.uc-email { font-size: 11px; color: var(--text-3); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.uc-foot  { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border); }
+.verified-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--green); background: var(--green-light); padding: 2px 6px; border-radius: 8px; margin-top: 3px; }
+
+/* ─── BI / BALANCE INICIAL ───────────────────────────────────── */
+.bi-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; box-shadow: var(--shadow); }
+.bi-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; font-family: var(--mono); }
+
+/* ─── CSV ─────────────────────────────────────────────────────── */
+.csv-zone { border: 1.5px dashed var(--green); border-radius: var(--radius-lg); padding: 20px; text-align: center; cursor: pointer; position: relative; transition: background .15s; background: #F7FBF9; margin-bottom: 12px; }
+.csv-zone:hover, .csv-zone.dz { background: var(--green-light); }
+.csv-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.preview-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; max-height: 240px; overflow-y: auto; }
+.ptable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ptable th { background: var(--bg); padding: 5px 8px; font-weight: 500; text-align: left; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
+.ptable td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+.ptable tr:last-child td { border-bottom: none; }
+.row-ok  { color: var(--text); }
+.row-err { color: var(--red); background: var(--red-bg); }
+.ok-tag  { font-size: 10px; color: #1B5E37; background: var(--green-light); padding: 1px 5px; border-radius: 5px; }
+.err-tag { font-size: 10px; color: var(--red); background: var(--red-bg); padding: 1px 5px; border-radius: 5px; }
+
+/* ─── BI SUB-TABS ────────────────────────────────────────────── */
+.card-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.ct { padding: 8px 14px; font-size: 12px; font-weight: 500; color: var(--text-2); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; font-family: var(--font); margin-bottom: -1px; }
+.ct.active { color: var(--green); border-bottom-color: var(--green); }
+
+/* ─── SECTION CARD ───────────────────────────────────────────── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.cb-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.cb-item  { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.chip { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; font-size: 13px; }
+.chip-del { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 14px; line-height: 1; padding: 0; }
+.chip-del:hover { color: var(--red); }
+.empty { text-align: center; padding: 2.5rem; color: var(--text-3); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════ LOGIN ══════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-icon">🌿</div>
+      <div>
+        <div class="brand-name">CCM</div>
+        <div class="brand-sub">Control de préstamos intercompañía</div>
+      </div>
+    </div>
+    <div class="login-title">Iniciar sesión</div>
+    <div class="login-sub">Accede con tu cuenta corporativa MCS-Chile</div>
+    <button class="ms-btn" id="ms-btn" onclick="loginM365()">
+      <div class="ms-logo"><div class="ms-r"></div><div class="ms-g"></div><div class="ms-b"></div><div class="ms-y"></div></div>
+      Continuar con Microsoft 365
+    </button>
+    <div id="login-loading" class="loading-row hidden">
+      <div class="spinner"></div>
+      <span id="loading-msg">Verificando identidad...</span>
+    </div>
+    <div id="login-err" class="alert alert-danger hidden"></div>
+    <div class="login-hint">
+      Solo se aceptan cuentas del dominio corporativo<br>
+      <span class="domain-pill">@mcs-chile.com</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ APP ════════════════════════════════ -->
+<div id="app-screen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="brand-icon" style="width:24px;height:24px;font-size:12px;border-radius:5px;">🌿</div>
+      <div>
+        <div class="topbar-brand">CCM</div>
+        <div class="topbar-env">mcs-chile.com</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="topbar-user"></span>
+      <span id="topbar-badge"></span>
+      <button class="btn btn-sm" onclick="logout()">Salir</button>
+    </div>
+  </div>
+  <div class="tab-bar" id="tab-bar"></div>
+  <div class="page-body">
+
+    <!-- RESUMEN -->
+    <div id="tab-resumen">
+      <div class="metrics" id="metrics"></div>
+      <div class="stitle">Saldos netos entre entidades</div>
+      <div id="balance-grid"></div>
+    </div>
+
+    <!-- REGISTRAR -->
+    <div id="tab-registrar" class="hidden">
+      <div id="form-alert" class="hidden"></div>
+      <div class="card">
+        <div class="row">
+          <div><label class="lbl">Tipo</label>
+            <select id="tipo"><option value="prestamo">Préstamo</option><option value="devolucion">Devolución</option></select></div>
+          <div><label class="lbl">Fecha</label><input type="date" id="fecha"></div>
+        </div>
+        <div class="row">
+          <div><label class="lbl">Entidad que presta / devuelve</label><select id="origen"></select></div>
+          <div><label class="lbl">Entidad que recibe</label><select id="destino"></select></div>
+        </div>
+        <div class="row3">
+          <div><label class="lbl">Monto</label><input type="number" id="monto" placeholder="0" min="0"></div>
+          <div><label class="lbl">Moneda</label>
+            <select id="moneda"><option>CLP</option><option>USD</option><option>EUR</option><option>UF</option></select></div>
+          <div><label class="lbl">Referencia</label><input type="text" id="ref" placeholder="Ej: Factura 001"></div>
+        </div>
+        <div style="margin-bottom:12px;"><label class="lbl">Notas (opcional)</label>
+          <textarea id="notas" rows="2" placeholder="Detalle del movimiento..."></textarea></div>
+        <hr class="divider">
+        <div class="stitle">Comprobante de transferencia</div>
+        <div id="upload-wrap">
+          <div class="upload-zone" id="upload-zone"
+            ondragover="event.preventDefault();this.classList.add('dz')"
+            ondragleave="this.classList.remove('dz')" ondrop="handleDrop(event)">
+            <input type="file" id="comp-file" accept="image/*,application/pdf" onchange="handleFile(this.files[0])">
+            <div style="font-size:24px;color:var(--green);margin-bottom:6px;">↑</div>
+            <div style="font-size:13px;color:var(--text-2);"><strong style="color:var(--text);">Arrastra el comprobante</strong> o haz clic</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:4px;">JPG, PNG, WEBP o PDF · Máx. 5 MB</div>
+          </div>
+        </div>
+        <div id="prev-wrap" class="hidden">
+          <div class="prev-box">
+            <div class="prev-head">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span id="prev-icon"></span>
+                <span class="prev-name" id="prev-name"></span>
+                <span style="font-size:11px;color:var(--text-3);" id="prev-size"></span>
+              </div>
+              <button class="btn btn-sm" onclick="clearFile()">Quitar</button>
+            </div>
+            <div id="prev-content"></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="registrar()">Registrar movimiento</button>
+      </div>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div id="tab-historial" class="hidden">
+      <div id="cv-wrap" class="comp-view hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:500;" id="cv-title"></div>
+          <button class="btn btn-sm" onclick="closeCv()">Cerrar</button>
+        </div>
+        <div id="cv-content"></div>
+      </div>
+      <div class="filter-row">
+        <select id="f-ent" onchange="renderHistorial()"><option value="">Todas las entidades</option></select>
+        <select id="f-tipo" onchange="renderHistorial()">
+          <option value="">Todos los tipos</option>
+          <option value="prestamo">Préstamos</option>
+          <option value="devolucion">Devoluciones</option>
+          <option value="balance_inicial">Balance inicial</option>
+        </select>
+        <select id="f-mon" onchange="renderHistorial()"><option value="">Todas las monedas</option></select>
+        <select id="f-comp" onchange="renderHistorial()">
+          <option value="">Con y sin comprobante</option>
+          <option value="con">Con comprobante</option>
+          <option value="sin">Sin comprobante</option>
+        </select>
+      </div>
+      <div class="tw">
+        <table><thead>
+          <tr><th>Fecha</th><th>Tipo</th><th>Desde</th><th>Hacia</th><th>Monto</th><th>Ref</th><th>Comprobante</th><th>Registró</th><th id="th-del"></th></tr>
+        </thead><tbody id="hist-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- BALANCE INICIAL -->
+    <div id="tab-balance" class="hidden">
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:1rem;">Saldos preexistentes entre entidades antes del inicio del sistema. Se suman al neto de cada par.</p>
+      <div class="card">
+        <div class="card-tabs">
+          <button class="ct active" id="ct-manual" onclick="switchBiTab('manual')">Ingreso manual</button>
+          <button class="ct" id="ct-masivo" onclick="switchBiTab('masivo')">Carga masiva (CSV)</button>
+        </div>
+        <!-- MANUAL -->
+        <div id="bi-manual">
+          <div id="bi-alert" class="hidden"></div>
+          <div id="bi-list" style="margin-bottom:1rem;"></div>
+          <hr class="divider">
+          <div class="stitle">Agregar saldo inicial</div>
+          <div class="row">
+            <div><label class="lbl">Entidad acreedora (quien prestó)</label><select id="bi-ac"></select></div>
+            <div><label class="lbl">Entidad deudora (quien debe)</label><select id="bi-deu"></select></div>
+          </div>
+          <div class="row3">
+            <div><label class="lbl">Monto</label><input type="number" id="bi-monto" placeholder="0" min="0"></div>
+            <div><label class="lbl">Moneda</label>
+              <select id="bi-moneda"><option>CLP</option><option>USD</option><option>EUR</option><option>UF</option></select></div>
+            <div><label class="lbl">Descripción</label><input type="text" id="bi-desc" placeholder="Ej: Saldo al 01/01/2024"></div>
+          </div>
+          <button class="btn btn-primary" onclick="agregarBI()">Guardar saldo inicial</button>
+        </div>
+        <!-- MASIVO -->
+        <div id="bi-masivo" class="hidden">
+          <div id="csv-alert" class="hidden"></div>
+          <div style="background:var(--bg);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;font-size:13px;">
+            <div style="font-weight:500;margin-bottom:6px;">Formato del archivo CSV</div>
+            <div class="tw" style="margin-bottom:6px;">
+              <table><thead><tr><th>acreedor</th><th>deudor</th><th>monto</th><th>moneda</th><th>descripcion</th></tr></thead>
+              <tbody><tr><td style="color:var(--text-3);">Empresa A</td><td style="color:var(--text-3);">Empresa B</td><td style="color:var(--text-3);">5000000</td><td style="color:var(--text-3);">CLP</td><td style="color:var(--text-3);">Saldo al 01/01/2024</td></tr></tbody></table>
+            </div>
+            <div style="font-size:11px;color:var(--text-3);">· Separador: coma o punto y coma · Monedas válidas: CLP, USD, EUR, UF · <em>descripcion</em> es opcional · Entidades nuevas se crean automáticamente</div>
+          </div>
+          <div class="csv-zone" id="csv-zone"
+            ondragover="event.preventDefault();this.classList.add('dz')"
+            ondragleave="this.classList.remove('dz')" ondrop="handleCsvDrop(event)">
+            <input type="file" id="csv-file" accept=".csv,.txt" onchange="handleCsvFile(this.files[0])">
+            <div style="font-size:24px;color:var(--green);margin-bottom:6px;">📂</div>
+            <div style="font-size:13px;color:var(--text-2);"><strong style="color:var(--text);">Arrastra tu CSV aquí</strong> o haz clic</div>
+          </div>
+          <div id="csv-preview" class="hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:13px;font-weight:500;" id="csv-summary"></div>
+              <button class="btn btn-sm" onclick="clearCsv()">Limpiar</button>
+            </div>
+            <div class="preview-wrap">
+              <table class="ptable"><thead id="csv-th"></thead><tbody id="csv-tb"></tbody></table>
+            </div>
+            <button class="btn btn-primary" id="csv-btn" onclick="importarCSV()">Importar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENTIDADES -->
+    <div id="tab-entidades" class="hidden">
+      <div class="card">
+        <div class="stitle" style="margin-bottom:12px;">Entidades registradas</div>
+        <div id="ent-chips" class="cb-group" style="margin-bottom:16px;"></div>
+        <div class="row" style="margin-bottom:0;">
+          <div><label class="lbl">Nueva entidad</label><input type="text" id="nueva-ent" placeholder="Ej: CCM Inversiones SpA"></div>
+          <div style="display:flex;align-items:flex-end;"><button class="btn" onclick="agregarEnt()" style="width:100%;">Agregar</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USUARIOS -->
+    <div id="tab-usuarios" class="hidden">
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:1rem;">Solo se permiten cuentas <span class="mono" style="color:var(--green);">@mcs-chile.com</span>. La identidad se verifica vía Microsoft 365 al iniciar sesión.</p>
+      <div id="u-alert" class="hidden"></div>
+      <div id="u-cards" class="uc-grid"></div>
+      <hr class="divider">
+      <div class="card">
+        <div class="stitle" style="margin-bottom:12px;">Agregar usuario</div>
+        <div class="row">
+          <div><label class="lbl">Nombre completo</label><input type="text" id="u-nombre" placeholder="Ej: María González"></div>
+          <div><label class="lbl">Correo <span style="color:var(--green);font-family:var(--mono);">@mcs-chile.com</span></label>
+            <input type="email" id="u-email" placeholder="nombre@mcs-chile.com"></div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label class="lbl">Rol</label>
+          <select id="u-rol" onchange="renderRolHelp()">
+            <option value="admin">Administrador — acceso total</option>
+            <option value="editor">Editor — registra movimientos</option>
+            <option value="viewer">Visor — solo lectura</option>
+          </select>
+          <div id="rol-help" style="font-size:11px;color:var(--text-3);margin-top:5px;"></div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="lbl">Restricción por entidad <span style="font-weight:400;color:var(--text-3);">(vacío = todas)</span></label>
+          <div class="cb-group" id="u-ent-checks"></div>
+        </div>
+        <button class="btn btn-primary" onclick="agregarUsuario()">Agregar usuario</button>
+      </div>
+    </div>
+
+  </div><!-- /page-body -->
+</div><!-- /app -->
+
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────
+const ALLOWED_DOMAIN = 'mcs-chile.com';
+const STORAGE_KEY    = 'ccm_v1';
+
+const ROLES = {
+  admin:  { label:'Administrador', tabs:['resumen','registrar','historial','balance','entidades','usuarios'], canDelete:true },
+  editor: { label:'Editor',        tabs:['resumen','registrar','historial'],                                  canDelete:false },
+  viewer: { label:'Visor',         tabs:['resumen','historial'],                                              canDelete:false }
+};
+const ROL_HELP = {
+  admin:  'Acceso total: registra, elimina, gestiona entidades, balances iniciales y usuarios.',
+  editor: 'Puede registrar y consultar movimientos. Sin acceso a configuración.',
+  viewer: 'Solo puede ver resumen e historial. Sin capacidad de registro.'
+};
+const TAB_LABELS = { resumen:'Resumen', registrar:'Registrar', historial:'Historial', balance:'Balance inicial', entidades:'Entidades', usuarios:'Usuarios' };
+const AV_CLS     = { admin:'av-admin', editor:'av-editor', viewer:'av-viewer' };
+
+// ─── STATE ─────────────────────────────────────────────────────
+let state = { entidades:[], movimientos:[], balancesIniciales:[], usuarios:[], sesionId:null };
+let pendingFile=null, currentTab='resumen', csvRows=[];
+
+// ─── PERSIST ───────────────────────────────────────────────────
+function loadState() {
+  try { const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); if(s.entidades) state=s; } catch(_){}
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(_){}
+}
+
+// ─── HELPERS ───────────────────────────────────────────────────
+const me = ()=> state.usuarios.find(u=>u.id===state.sesionId);
+const canDo = k => me() ? ROLES[me().rol][k] : false;
+const myEnts = ()=>{ const u=me(); return (u?.entidades?.length) ? u.entidades : null; };
+function filterA(items){
+  const me=myEnts(); if(!me) return items;
+  return items.filter(m=>(m.origen&&me.includes(m.origen))||(m.destino&&me.includes(m.destino))||(m.acreedor&&me.includes(m.acreedor))||(m.deudor&&me.includes(m.deudor)));
+}
+
+// ─── SSO ───────────────────────────────────────────────────────
+async function loginM365(){
+  const btn=document.getElementById('ms-btn');
+  const load=document.getElementById('login-loading');
+  const err=document.getElementById('login-err');
+  btn.disabled=true; btn.style.display='none';
+  load.classList.remove('hidden'); err.classList.add('hidden');
+  document.getElementById('loading-msg').textContent='Verificando identidad con Microsoft 365...';
+
+  // Try Teams JS SDK first (when running inside Teams)
+  let profile=null;
+  try {
+    await microsoftTeams.app.initialize();
+    const ctx = await microsoftTeams.app.getContext();
+    if(ctx?.user?.loginHint){
+      profile = { email: ctx.user.loginHint, name: ctx.user.displayName||ctx.user.loginHint.split('@')[0] };
+    }
+  } catch(_){}
+
+  // Fallback: Claude API + M365 MCP (when running outside Teams)
+  if(!profile?.email){
+    try {
+      document.getElementById('loading-msg').textContent='Consultando Microsoft 365...';
+      const resp = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          model:'claude-sonnet-4-20250514', max_tokens:300,
+          mcp_servers:[{type:'url',url:'https://microsoft365.mcp.claude.com/mcp',name:'m365'}],
+          system:'Return ONLY valid JSON. Use M365 tools to get signed-in user display name and email. Return: {"name":"...","email":"..."}',
+          messages:[{role:'user',content:'Get my Microsoft 365 profile. Return only JSON.'}]
+        })
+      });
+      const data=await resp.json();
+      for(const b of(data.content||[])){
+        if(b.type==='text'&&b.text){ try{profile=JSON.parse(b.text.replace(/```json|```/g,'').trim());}catch(_){} }
+      }
+      if(!profile?.email){
+        const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ');
+        const em=txt.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+        const nm=txt.match(/"name"\s*:\s*"([^"]+)"/);
+        if(em) profile={email:em[0], name:nm?nm[1]:em[0].split('@')[0]};
+      }
+    } catch(_){}
+  }
+
+  if(!profile?.email){
+    showLoginErr('No se pudo obtener el perfil de Microsoft 365. Intenta nuevamente.');
+    btn.disabled=false; btn.style.display='flex'; load.classList.add('hidden');
+    return;
+  }
+
+  const email=profile.email.toLowerCase().trim();
+  const domain=email.split('@')[1]||'';
+
+  if(domain!==ALLOWED_DOMAIN){
+    showLoginErr(`Acceso denegado. La cuenta <strong>${email}</strong> no pertenece al dominio <strong>@${ALLOWED_DOMAIN}</strong>.`);
+    btn.disabled=false; btn.style.display='flex'; load.classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('loading-msg').textContent='Verificando permisos...';
+  let user=state.usuarios.find(u=>u.email.toLowerCase()===email);
+  if(!user){
+    user={id:'u_'+Date.now(), nombre:profile.name||email.split('@')[0], email, rol:'viewer', entidades:[], ssoVerified:true};
+    state.usuarios.push(user);
+  } else {
+    user.ssoVerified=true;
+    if(profile.name) user.nombre=profile.name;
+  }
+  state.sesionId=user.id;
+  saveState(); showApp();
+}
+
+function showLoginErr(msg){
+  const e=document.getElementById('login-err');
+  e.innerHTML=msg; e.classList.remove('hidden');
+}
+
+function logout(){ state.sesionId=null; saveState(); location.reload(); }
+
+// ─── SHOW LOGIN / APP ──────────────────────────────────────────
+function showLogin(){ document.getElementById('login-screen').style.display='flex'; }
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app-screen').classList.add('visible');
+  const u=me();
+  document.getElementById('topbar-user').textContent=u.nombre;
+  document.getElementById('topbar-badge').innerHTML=`<span class="badge b-${u.rol}">${ROLES[u.rol].label}</span>`;
+  document.getElementById('fecha').value=new Date().toISOString().split('T')[0];
+  renderTabs(); renderAll(); showTab(currentTab);
+}
+
+// ─── TABS ──────────────────────────────────────────────────────
+function renderTabs(){
+  const tabs=ROLES[me().rol].tabs;
+  document.getElementById('tab-bar').innerHTML=tabs.map(t=>
+    `<button class="tab-btn${currentTab===t?' active':''}" onclick="showTab('${t}')">${TAB_LABELS[t]}</button>`
+  ).join('');
+}
+function showTab(t){
+  const tabs=ROLES[me().rol].tabs; if(!tabs.includes(t)) t=tabs[0];
+  currentTab=t;
+  tabs.forEach(id=>{ document.getElementById('tab-'+id).classList.toggle('hidden', id!==t); });
+  document.querySelectorAll('.tab-btn').forEach(el=>el.classList.toggle('active', el.textContent===TAB_LABELS[t]));
+}
+
+function renderAll(){ renderSelects(); renderResumen(); renderHistorial(); renderEntidades(); renderBI(); renderUsuarios(); renderUEntChecks(); }
+
+// ─── SELECTS ───────────────────────────────────────────────────
+function renderSelects(){
+  const e=state.entidades;
+  ['origen','destino','bi-ac','bi-deu'].forEach(id=>{
+    const s=document.getElementById(id); if(!s) return;
+    const p=s.value; s.innerHTML=e.map(x=>`<option>${x}</option>`).join(''); if(e.includes(p)) s.value=p;
+  });
+  const fe=document.getElementById('f-ent'), pfe=fe.value;
+  fe.innerHTML='<option value="">Todas las entidades</option>'+e.map(x=>`<option>${x}</option>`).join('');
+  if(e.includes(pfe)) fe.value=pfe;
+  const monedas=[...new Set([...state.movimientos,...state.balancesIniciales].map(m=>m.moneda).filter(Boolean))];
+  const fm=document.getElementById('f-mon'), pm=fm.value;
+  fm.innerHTML='<option value="">Todas las monedas</option>'+monedas.map(x=>`<option>${x}</option>`).join('');
+  if(monedas.includes(pm)) fm.value=pm;
+  document.getElementById('th-del').textContent='';
+}
+
+// ─── SALDOS ────────────────────────────────────────────────────
+function calcSaldos(){
+  const s={};
+  const ensure=(a,b,cur)=>{ const k=[a,b].sort().join('|||'); if(!s[k]) s[k]={}; if(!s[k][cur]) s[k][cur]={ini:0,movs:0}; return{k,sign:a<b?1:-1}; };
+  filterA(state.balancesIniciales).forEach(bi=>{ const{k}=ensure(bi.acreedor,bi.deudor,bi.moneda); s[k][bi.moneda].ini+=(bi.acreedor<bi.deudor?1:-1)*bi.monto; });
+  filterA(state.movimientos).forEach(m=>{ const{k,sign}=ensure(m.origen,m.destino,m.moneda); s[k][m.moneda].movs+=m.tipo==='prestamo'?sign*m.monto:-(sign*m.monto); });
+  return s;
+}
+
+// ─── RESUMEN ───────────────────────────────────────────────────
+function renderResumen(){
+  const mvs=filterA(state.movimientos);
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric"><div class="metric-lbl">Entidades</div><div class="metric-val">${state.entidades.length}</div></div>
+    <div class="metric"><div class="metric-lbl">Movimientos</div><div class="metric-val">${mvs.length}</div></div>
+    <div class="metric"><div class="metric-lbl">Bal. iniciales</div><div class="metric-val">${filterA(state.balancesIniciales).length}</div></div>
+    <div class="metric"><div class="metric-lbl">Comprobantes</div><div class="metric-val">${mvs.filter(m=>m.comprobante).length}</div></div>`;
+  const sal=calcSaldos();
+  const cards=Object.entries(sal).map(([key,byCur])=>{
+    const[a,b]=key.split('|||');
+    const rows=Object.entries(byCur).map(([cur,v])=>{
+      const net=v.ini+v.movs, cls=net>0?'pos':net<0?'neg':'zero';
+      const abs=Math.abs(net).toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2});
+      const dir=net>0?`${b} debe a ${a}`:net<0?`${a} debe a ${b}`:'Sin saldo pendiente';
+      return `<div class="bc-row">
+        <div><span class="bc-cur">${cur}</span></div>
+        <div><div class="bc-net ${cls}">${cur} ${abs}</div>
+          <div class="bc-dir">${dir}</div>
+          <div class="bc-brk">Inicial: ${v.ini.toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2})} · Movs: ${v.movs.toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2})}</div>
+        </div></div>`;
+    }).join('');
+    return `<div class="bc"><div class="bc-head"><div class="bc-pair">${a}<span class="bc-sep">↔</span>${b}</div></div>${rows}</div>`;
+  });
+  document.getElementById('balance-grid').innerHTML=cards.length?cards.join(''):'<div class="empty">Sin movimientos ni saldos iniciales registrados aún.</div>';
+}
+
+// ─── REGISTRAR ─────────────────────────────────────────────────
+function registrar(){
+  const tipo=document.getElementById('tipo').value, fecha=document.getElementById('fecha').value;
+  const origen=document.getElementById('origen').value, destino=document.getElementById('destino').value;
+  const monto=parseFloat(document.getElementById('monto').value), moneda=document.getElementById('moneda').value;
+  const ref=document.getElementById('ref').value.trim(), notas=document.getElementById('notas').value.trim();
+  if(!fecha||!origen||!destino||isNaN(monto)||monto<=0){ fAlert('Completa todos los campos requeridos.','danger'); return; }
+  if(origen===destino){ fAlert('Origen y destino no pueden ser la misma entidad.','danger'); return; }
+  const mov={id:Date.now().toString(),tipo,fecha,origen,destino,monto,moneda,ref,notas,registradoPor:me().nombre};
+  if(pendingFile) mov.comprobante={name:pendingFile.name,size:pendingFile.size,type:pendingFile.type,data:pendingFile.data};
+  state.movimientos.push(mov); saveState(); renderAll();
+  document.getElementById('monto').value=''; document.getElementById('ref').value=''; document.getElementById('notas').value=''; clearFile();
+  fAlert('Movimiento registrado correctamente.','success');
+  setTimeout(()=>document.getElementById('form-alert').classList.add('hidden'),3000);
+}
+function fAlert(msg,type){
+  const a=document.getElementById('form-alert');
+  a.textContent=msg; a.className=`alert alert-${type}`; a.classList.remove('hidden');
+}
+
+// ─── HISTORIAL ─────────────────────────────────────────────────
+function renderHistorial(){
+  const fe=document.getElementById('f-ent').value, ft=document.getElementById('f-tipo').value;
+  const fm=document.getElementById('f-mon').value,  fc=document.getElementById('f-comp').value;
+  let all=[];
+  filterA(state.movimientos).forEach(m=>all.push({...m,_src:'mov'}));
+  filterA(state.balancesIniciales).forEach(b=>all.push({id:b.id,tipo:'balance_inicial',fecha:'—',origen:b.acreedor,destino:b.deudor,monto:b.monto,moneda:b.moneda,ref:b.desc||'',registradoPor:'',comprobante:null,_src:'bi'}));
+  all=all.reverse();
+  if(fe) all=all.filter(m=>m.origen===fe||m.destino===fe);
+  if(ft) all=all.filter(m=>m.tipo===ft);
+  if(fm) all=all.filter(m=>m.moneda===fm);
+  if(fc==='con') all=all.filter(m=>m.comprobante);
+  if(fc==='sin') all=all.filter(m=>!m.comprobante);
+  const body=document.getElementById('hist-body');
+  if(!all.length){ body.innerHTML='<tr><td colspan="9" class="empty">Sin registros.</td></tr>'; return; }
+  const showDel=canDo('canDelete');
+  body.innerHTML=all.map(m=>{
+    let badge='';
+    if(m.tipo==='prestamo')       badge='<span class="badge b-prestamo">Préstamo</span>';
+    else if(m.tipo==='devolucion') badge='<span class="badge b-devolucion">Devolución</span>';
+    else                           badge='<span class="badge b-balance">Bal. inicial</span>';
+    const comp=m.comprobante?`<button class="comp-btn" onclick="verComp('${m.id}')">Ver</button>`:`<span style="font-size:11px;color:var(--text-3);">—</span>`;
+    let del='<td></td>';
+    if(showDel){
+      if(m._src==='mov') del=`<td><button class="btn btn-xs btn-danger" onclick="eliminar('${m.id}')">×</button></td>`;
+      else               del=`<td><button class="btn btn-xs btn-danger" onclick="eliminarBI('${m.id}')">×</button></td>`;
+    }
+    return `<tr><td>${m.fecha}</td><td>${badge}</td><td>${m.origen}</td><td>${m.destino}</td>
+      <td class="tnum">${m.moneda} ${Number(m.monto).toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2})}</td>
+      <td style="font-size:12px;color:var(--text-3);">${m.ref||''}</td>
+      <td>${comp}</td>
+      <td style="font-size:11px;color:var(--text-3);">${m.registradoPor||''}</td>${del}</tr>`;
+  }).join('');
+}
+function verComp(id){ const m=state.movimientos.find(x=>x.id===id); if(!m?.comprobante) return; const f=m.comprobante; document.getElementById('cv-title').textContent=f.name; document.getElementById('cv-content').innerHTML=f.type==='application/pdf'?`<iframe src="${f.data}"></iframe>`:`<img src="${f.data}" alt="Comprobante">`; document.getElementById('cv-wrap').classList.remove('hidden'); document.getElementById('cv-wrap').scrollIntoView({behavior:'smooth',block:'start'}); }
+function closeCv(){ document.getElementById('cv-wrap').classList.add('hidden'); document.getElementById('cv-content').innerHTML=''; }
+function eliminar(id){ state.movimientos=state.movimientos.filter(m=>m.id!==id); saveState(); renderAll(); }
+
+// ─── UPLOAD ────────────────────────────────────────────────────
+function handleFile(f){ if(!f) return; if(f.size>5*1024*1024){ fAlert('El archivo supera 5 MB.','danger'); return; } const r=new FileReader(); r.onload=e=>{ pendingFile={name:f.name,size:f.size,type:f.type,data:e.target.result}; showPreview(pendingFile); }; r.readAsDataURL(f); }
+function handleDrop(e){ e.preventDefault(); document.getElementById('upload-zone').classList.remove('dz'); handleFile(e.dataTransfer.files[0]); }
+function showPreview(f){ document.getElementById('upload-wrap').classList.add('hidden'); document.getElementById('prev-wrap').classList.remove('hidden'); document.getElementById('prev-name').textContent=f.name; document.getElementById('prev-size').textContent=fmtSz(f.size); document.getElementById('prev-icon').textContent=f.type==='application/pdf'?'📄':'🖼'; document.getElementById('prev-content').innerHTML=f.type==='application/pdf'?`<iframe class="prev-pdf" src="${f.data}"></iframe>`:`<img class="prev-img" src="${f.data}" alt="Vista previa">`; }
+function clearFile(){ pendingFile=null; document.getElementById('upload-wrap').classList.remove('hidden'); document.getElementById('prev-wrap').classList.add('hidden'); document.getElementById('prev-content').innerHTML=''; document.getElementById('comp-file').value=''; }
+function fmtSz(b){ if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+
+// ─── BALANCE INICIAL ───────────────────────────────────────────
+function switchBiTab(t){ document.getElementById('bi-manual').classList.toggle('hidden',t!=='manual'); document.getElementById('bi-masivo').classList.toggle('hidden',t!=='masivo'); document.getElementById('ct-manual').classList.toggle('active',t==='manual'); document.getElementById('ct-masivo').classList.toggle('active',t==='masivo'); }
+function renderBI(){
+  const items=filterA(state.balancesIniciales);
+  document.getElementById('bi-list').innerHTML=items.length?items.map(bi=>`<div class="bi-item"><div><div style="font-size:13px;font-weight:500;">${bi.acreedor} → ${bi.deudor}</div><div class="bi-sub">${bi.desc||'Sin descripción'} · ${bi.moneda}</div></div><div style="text-align:right;"><div style="font-size:14px;font-weight:600;font-family:var(--mono);" class="pos">${bi.moneda} ${Number(bi.monto).toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2})}</div><button class="btn btn-xs btn-danger" style="margin-top:4px;" onclick="eliminarBI('${bi.id}')">Eliminar</button></div></div>`).join(''):'<div class="empty" style="padding:1rem;">Sin saldos iniciales.</div>';
+}
+function agregarBI(){
+  const ac=document.getElementById('bi-ac').value, deu=document.getElementById('bi-deu').value;
+  const mo=parseFloat(document.getElementById('bi-monto').value), mon=document.getElementById('bi-moneda').value;
+  const de=document.getElementById('bi-desc').value.trim();
+  if(ac===deu){ biAlert('Acreedora y deudora no pueden ser iguales.','danger'); return; }
+  if(isNaN(mo)||mo<=0){ biAlert('Ingresa un monto válido.','danger'); return; }
+  state.balancesIniciales.push({id:Date.now().toString(),acreedor:ac,deudor:deu,monto:mo,moneda:mon,desc:de});
+  saveState(); renderAll(); document.getElementById('bi-monto').value=''; document.getElementById('bi-desc').value='';
+  biAlert('Saldo inicial guardado.','success'); setTimeout(()=>document.getElementById('bi-alert').classList.add('hidden'),3000);
+}
+function biAlert(m,t){ const a=document.getElementById('bi-alert'); a.textContent=m; a.className=`alert alert-${t}`; a.classList.remove('hidden'); }
+function eliminarBI(id){ state.balancesIniciales=state.balancesIniciales.filter(b=>b.id!==id); saveState(); renderAll(); }
+
+// ─── CSV ───────────────────────────────────────────────────────
+function handleCsvDrop(e){ e.preventDefault(); document.getElementById('csv-zone').classList.remove('dz'); handleCsvFile(e.dataTransfer.files[0]); }
+function handleCsvFile(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>parseCsvText(e.target.result);
+  reader.readAsText(file,'UTF-8');
+}
+function parseCsvText(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2){ csvAlert('Archivo vacío o sin datos.','danger'); return; }
+  const delim=lines[0].includes(';')?';':',';
+  const headers=lines[0].split(delim).map(h=>h.trim().toLowerCase().replace(/['"]/g,''));
+  const idx={acreedor:-1,deudor:-1,monto:-1,moneda:-1,descripcion:-1};
+  headers.forEach((h,i)=>{ if(h.includes('acreed'))idx.acreedor=i; else if(h.includes('deud'))idx.deudor=i; else if(h.includes('mont'))idx.monto=i; else if(h.includes('moned'))idx.moneda=i; else if(h.includes('desc')||h.includes('detalle')||h.includes('nota'))idx.descripcion=i; });
+  if(idx.acreedor<0||idx.deudor<0||idx.monto<0){ csvAlert(`Columnas requeridas no encontradas. Detectadas: ${headers.join(', ')}`,'danger'); return; }
+  const VALID=['CLP','USD','EUR','UF'];
+  csvRows=[];
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(delim).map(c=>c.trim().replace(/^["']|["']$/g,''));
+    const acreedor=cols[idx.acreedor]||'', deudor=cols[idx.deudor]||'';
+    const montoRaw=(cols[idx.monto]||'').replace(/[.$\s]/g,'').replace(',','.');
+    const monto=parseFloat(montoRaw);
+    const moneda=idx.moneda>=0?(cols[idx.moneda]||'CLP').toUpperCase().trim():'CLP';
+    const desc=idx.descripcion>=0?cols[idx.descripcion]||'':'';
+    const errors=[];
+    if(!acreedor) errors.push('Acreedor vacío'); if(!deudor) errors.push('Deudor vacío');
+    if(acreedor===deudor) errors.push('Acreedor = Deudor'); if(isNaN(monto)||monto<=0) errors.push('Monto inválido');
+    if(!VALID.includes(moneda)) errors.push(`Moneda "${moneda}" inválida`);
+    csvRows.push({acreedor,deudor,monto,moneda,desc,errors,_line:i+1});
+  }
+  renderCsvPreview();
+}
+function renderCsvPreview(){
+  const ok=csvRows.filter(r=>!r.errors.length).length, err=csvRows.length-ok;
+  document.getElementById('csv-summary').innerHTML=`<span class="ok-tag">${ok} filas válidas</span>${err?` &nbsp;<span class="err-tag">${err} con errores</span>`:''}`;
+  document.getElementById('csv-th').innerHTML='<tr><th>#</th><th>Acreedor</th><th>Deudor</th><th>Monto</th><th>Moneda</th><th>Descripción</th><th>Estado</th></tr>';
+  document.getElementById('csv-tb').innerHTML=csvRows.map(r=>`<tr class="${r.errors.length?'row-err':'row-ok'}"><td>${r._line}</td><td>${r.acreedor}</td><td>${r.deudor}</td><td>${isNaN(r.monto)?r.monto:r.monto.toLocaleString('es-CL')}</td><td>${r.moneda}</td><td>${r.desc||'—'}</td><td>${r.errors.length?`<span class="err-tag">${r.errors.join(' · ')}</span>`:'<span class="ok-tag">✓</span>'}</td></tr>`).join('');
+  document.getElementById('csv-preview').classList.remove('hidden');
+  const btn=document.getElementById('csv-btn'); btn.disabled=ok===0; btn.textContent=`Importar ${ok} saldo${ok!==1?'s':''} válido${ok!==1?'s':''}`;
+}
+function importarCSV(){
+  const valid=csvRows.filter(r=>!r.errors.length); if(!valid.length) return;
+  valid.forEach(r=>{
+    if(!state.entidades.includes(r.acreedor)) state.entidades.push(r.acreedor);
+    if(!state.entidades.includes(r.deudor))   state.entidades.push(r.deudor);
+    state.balancesIniciales.push({id:'bi_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),acreedor:r.acreedor,deudor:r.deudor,monto:r.monto,moneda:r.moneda,desc:r.desc});
+  });
+  saveState(); renderAll(); clearCsv();
+  csvAlert(`${valid.length} saldo${valid.length!==1?'s':''} importado${valid.length!==1?'s':''} correctamente.`,'success');
+  setTimeout(()=>document.getElementById('csv-alert').classList.add('hidden'),4000);
+}
+function clearCsv(){ csvRows=[]; document.getElementById('csv-preview').classList.add('hidden'); document.getElementById('csv-file').value=''; }
+function csvAlert(m,t){ const a=document.getElementById('csv-alert'); a.textContent=m; a.className=`alert alert-${t}`; a.classList.remove('hidden'); }
+
+// ─── ENTIDADES ─────────────────────────────────────────────────
+function renderEntidades(){
+  document.getElementById('ent-chips').innerHTML=state.entidades.map(e=>`<div class="chip">${e}<button class="chip-del" onclick="eliminarEnt('${e.replace(/'/g,"\\'")}')">×</button></div>`).join('')||'<div style="font-size:13px;color:var(--text-3);">Sin entidades. Agrégalas aquí o importa un CSV de balance inicial.</div>';
+}
+function agregarEnt(){ const v=document.getElementById('nueva-ent').value.trim(); if(!v||state.entidades.includes(v)) return; state.entidades.push(v); saveState(); renderAll(); document.getElementById('nueva-ent').value=''; }
+function eliminarEnt(e){ if(state.movimientos.some(m=>m.origen===e||m.destino===e)||state.balancesIniciales.some(b=>b.acreedor===e||b.deudor===e)){ alert(`No se puede eliminar "${e}": tiene movimientos o saldos asociados.`); return; } state.entidades=state.entidades.filter(x=>x!==e); saveState(); renderAll(); }
+
+// ─── USUARIOS ──────────────────────────────────────────────────
+function renderUsuarios(){
+  document.getElementById('u-cards').innerHTML=state.usuarios.map(u=>{
+    const ini=u.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const isSelf=u.id===state.sesionId;
+    const ents=u.entidades.length?u.entidades.join(', '):'Todas las entidades';
+    return `<div class="uc"><div class="uc-head"><div class="av ${AV_CLS[u.rol]}">${ini}</div><div style="min-width:0;"><div class="uc-name">${u.nombre}</div><div class="uc-email">${u.email}</div>${u.ssoVerified?'<div class="verified-tag">✓ M365 verificado</div>':''}</div></div><div class="uc-foot"><div><span class="badge b-${u.rol}">${ROLES[u.rol].label}</span><div style="font-size:11px;color:var(--text-3);margin-top:4px;">${ents}</div></div>${isSelf?'<span style="font-size:11px;color:var(--text-3);">Tú</span>':`<button class="btn btn-xs btn-danger" onclick="eliminarUsuario('${u.id}')">Eliminar</button>`}</div></div>`;
+  }).join('')||'<div class="empty">Sin usuarios registrados.</div>';
+}
+function renderUEntChecks(){ document.getElementById('u-ent-checks').innerHTML=state.entidades.map(e=>`<label class="cb-item"><input type="checkbox" value="${e}"> ${e}</label>`).join(''); }
+function renderRolHelp(){ document.getElementById('rol-help').textContent=ROL_HELP[document.getElementById('u-rol').value]; }
+function agregarUsuario(){
+  const nb=document.getElementById('u-nombre').value.trim(), em=document.getElementById('u-email').value.trim().toLowerCase();
+  const rol=document.getElementById('u-rol').value;
+  if(!nb||!em){ uAlert('Nombre y correo son requeridos.','danger'); return; }
+  if((em.split('@')[1]||'')!==ALLOWED_DOMAIN){ uAlert(`Solo se permiten correos @${ALLOWED_DOMAIN}.`,'danger'); return; }
+  if(state.usuarios.some(u=>u.email===em)){ uAlert('Ya existe un usuario con ese correo.','danger'); return; }
+  const entidades=[...document.querySelectorAll('#u-ent-checks input:checked')].map(x=>x.value);
+  state.usuarios.push({id:'u'+Date.now(),nombre:nb,email:em,rol,entidades,ssoVerified:false});
+  saveState(); renderAll(); document.getElementById('u-nombre').value=''; document.getElementById('u-email').value='';
+  document.querySelectorAll('#u-ent-checks input').forEach(x=>x.checked=false);
+  uAlert('Usuario agregado. El badge "M365 verificado" aparecerá al primer inicio de sesión.','success');
+  setTimeout(()=>document.getElementById('u-alert').classList.add('hidden'),4000);
+}
+function uAlert(m,t){ const a=document.getElementById('u-alert'); a.textContent=m; a.className=`alert alert-${t}`; a.classList.remove('hidden'); }
+function eliminarUsuario(id){ if(id===state.sesionId){ alert('No puedes eliminar tu propia cuenta.'); return; } state.usuarios=state.usuarios.filter(u=>u.id!==id); saveState(); renderAll(); }
+
+// ─── INIT ──────────────────────────────────────────────────────
+renderRolHelp();
+loadState();
+if(state.sesionId && state.usuarios.find(u=>u.id===state.sesionId)) showApp();
+else showLogin();
+</script>
+</body>
+</html>
