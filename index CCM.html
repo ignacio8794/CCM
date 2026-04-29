@@ -603,7 +603,9 @@ async function loginM365(){
   document.getElementById('loading-msg').textContent='Verificando permisos...';
   let user=state.usuarios.find(u=>u.email.toLowerCase()===email);
   if(!user){
-    user={id:'u_'+Date.now(), nombre:profile.name||email.split('@')[0], email, rol:'viewer', entidades:[], ssoVerified:true};
+    // First user in the system becomes admin (bootstrap), subsequent users become viewer
+    const isFirstUser = state.usuarios.length === 0;
+    user={id:'u_'+Date.now(), nombre:profile.name||email.split('@')[0], email, rol: isFirstUser ? 'admin' : 'viewer', entidades:[], ssoVerified:true};
     state.usuarios.push(user);
   } else {
     user.ssoVerified=true;
@@ -876,8 +878,31 @@ function eliminarUsuario(id){ if(id===state.sesionId){ alert('No puedes eliminar
 // ─── INIT ──────────────────────────────────────────────────────
 renderRolHelp();
 loadState();
-if(state.sesionId && state.usuarios.find(u=>u.id===state.sesionId)) showApp();
-else showLogin();
+
+// Bootstrap: si no existe ningun admin, el usuario activo se promueve automaticamente
+function ensureAdmin(){
+  const hasAdmin = state.usuarios.some(u=>u.rol==='admin');
+  if(!hasAdmin && state.sesionId){
+    const u=state.usuarios.find(u=>u.id===state.sesionId);
+    if(u){ u.rol='admin'; saveState(); }
+  }
+}
+
+// Comando de emergencia desde consola del navegador: CCM_promoteToAdmin()
+window.CCM_promoteToAdmin = function(){
+  loadState();
+  if(!state.sesionId){ console.warn('[CCM] Sin sesion activa.'); return; }
+  const u=state.usuarios.find(u=>u.id===state.sesionId);
+  if(!u){ console.warn('[CCM] Usuario no encontrado.'); return; }
+  u.rol='admin'; saveState();
+  console.info('[CCM] '+u.email+' promovido a Administrador. Recargando...');
+  location.reload();
+};
+
+if(state.sesionId && state.usuarios.find(u=>u.id===state.sesionId)){
+  ensureAdmin();
+  showApp();
+} else showLogin();
 </script>
 </body>
 </html>
